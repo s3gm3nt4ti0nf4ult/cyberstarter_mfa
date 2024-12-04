@@ -1,0 +1,16 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1>Welcome {{ username }}</h1>
+<form method="post">
+<label>Comment:</label>
+<input name="comment">
+<input type="submit" value="Submit Comment">
+</form>
+{% for c in comments %}
+<p>{{ c[0] }}</p>
+{% endfor %}
+{% if not session.otp_secret %}
+<p><a href="/enroll">Enroll OTP</a></p>
+{% endif %}
+{% endblock %}
+
