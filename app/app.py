@@ -1,4 +1,4 @@
-from flask import Flask, g, render_template, request, redirect, url_for, session, send_file
+from flask import Flask, g, render_template, request, redirect, url_for, session, send_file, flash
 import sqlite3
 import pyotp
 import pyqrcode
@@ -55,6 +55,8 @@ def login():
                 return redirect(url_for('otp'))
             session['username'] = username
             return redirect(url_for('index'))
+        else:
+            flash("bad password")
     return render_template('login.html')
 
 @app.route('/otp', methods=['GET', 'POST'])
@@ -68,6 +70,8 @@ def otp():
         if row and pyotp.TOTP(row[0]).verify(request.form.get('otp','')):
             session['username'] = session.pop('pre_otp_user')
             return redirect(url_for('index'))
+        else:
+            flash("bad otp")
     return render_template('otp.html')
 
 @app.route('/enroll', methods=['GET','POST'])
@@ -84,6 +88,8 @@ def enroll():
                 session.pop('pending_otp_secret',None)
                 session.pop('pending_totp_uri',None)
                 return redirect(url_for('index'))
+            else:
+                flash("bad otp")
     else:
         secret = pyotp.random_base32()
         session['pending_otp_secret'] = secret
@@ -101,6 +107,7 @@ def download_qr():
     qr.png(buffer, scale=5)
     buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name="otp_qr.png", mimetype='image/png')
+
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000)
