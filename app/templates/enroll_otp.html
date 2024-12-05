@@ -2,7 +2,15 @@
 {% block content %}
 <h2>Enroll OTP</h2>
 <p>Scan this into Google Authenticator:</p>
-<p class="secret">{{ secret }}</p>
-<img src="data:image/png;base64,{{ qr_code_data }}" alt="QR Code">
+<p class="secret">{{ session['pending_otp_secret'] }}</p>
+{% if qr_data %}
+<img src="{{ qr_data }}" alt="QR Code"><br>
+{% endif %}
+<p><a href="/download_qr">Download QR Code PNG</a></p>
+<form method="post">
+<label>Enter current OTP code:</label>
+<input name="otp">
+<input type="submit" value="Verify & Enable OTP">
+</form>
 <p><a href="/">Back</a></p>
 {% endblock %}
