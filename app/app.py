@@ -1,4 +1,4 @@
-from flask import Flask, g, render_template, request, redirect, url_for, session
+from flask import Flask, g, render_template, request, redirect, url_for, session, send_file
 import sqlite3
 import pyotp
 import pyqrcode
@@ -7,6 +7,7 @@ import base64
 
 app = Flask(__name__)
 app.secret_key = 'secret'
+app.config['SESSION_COOKIE_NAME'] = 'cookie'
 
 def get_db():
     if not hasattr(g, 'db'):
@@ -19,10 +20,17 @@ def close_db(exception):
     if db is not None:
         db.close()
 
+def login_required(route_func):
+    def wrapper(*args, **kwargs):
+        if 'username' not in session:
+            return redirect(url_for('login'))
+        return route_func(*args, **kwargs)
+    wrapper.__name__ = route_func.__name__
+    return wrapper
+
 @app.route('/', methods=['GET', 'POST'])
+@login_required
 def index():
-    if 'username' not in session:
-        return redirect(url_for('login'))
     db = get_db()
     cur = db.execute('SELECT comment FROM comments')
     comments = cur.fetchall()
@@ -63,23 +71,36 @@ def otp():
     return render_template('otp.html')
 
 @app.route('/enroll', methods=['GET','POST'])
+@login_required
 def enroll():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    db = get_db()
-    cur = db.execute('SELECT otp_secret FROM users WHERE username=?',[session['username']])
-    row = cur.fetchone()
-    if not row[0]:
+    if request.method == 'POST':
+        db = get_db()
+        secret = session.get('pending_otp_secret')
+        if secret:
+            submitted_otp = request.form.get('otp','')
+            if pyotp.TOTP(secret).verify(submitted_otp):
+                db.execute('UPDATE users SET otp_secret=? WHERE username=?',[secret, session['username']])
+                db.commit()
+                session.pop('pending_otp_secret',None)
+                session.pop('pending_totp_uri',None)
+                return redirect(url_for('index'))
+    else:
         secret = pyotp.random_base32()
-        db.execute('UPDATE users SET otp_secret=? WHERE username=?',[secret, session['username']])
-        db.commit()
+        session['pending_otp_secret'] = secret
         totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(session['username'], issuer_name="MyFlaskApp")
-        qr = pyqrcode.create(totp_uri)
-        buffer = io.BytesIO()
-        qr.png(buffer, scale=5)
-        qr_code_data = base64.b64encode(buffer.getvalue()).decode()
-        return render_template('enroll_otp.html', secret=secret, qr_code_data=qr_code_data)
-    return redirect(url_for('index'))
+        session['pending_totp_uri'] = totp_uri
+    return render_template('enroll_otp.html')
+
+@app.route('/download_qr')
+@login_required
+def download_qr():
+    if 'pending_totp_uri' not in session:
+        return redirect(url_for('enroll'))
+    qr = pyqrcode.create(session['pending_totp_uri'])
+    buffer = io.BytesIO()
+    qr.png(buffer, scale=5)
+    buffer.seek(0)
+    return send_file(buffer, as_attachment=True, download_name="otp_qr.png", mimetype='image/png')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000)
