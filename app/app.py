@@ -95,7 +95,15 @@ def enroll():
         session['pending_otp_secret'] = secret
         totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(session['username'], issuer_name="MyFlaskApp")
         session['pending_totp_uri'] = totp_uri
-    return render_template('enroll_otp.html')
+    # Generate QR code data on GET or after form failure
+    qr_data = None
+    if 'pending_totp_uri' in session:
+        qr = pyqrcode.create(session['pending_totp_uri'])
+        buffer = io.BytesIO()
+        qr.png(buffer, scale=5)
+        qr_code_data = base64.b64encode(buffer.getvalue()).decode()
+        qr_data = "data:image/png;base64," + qr_code_data
+    return render_template('enroll_otp.html', qr_data=qr_data)
 
 @app.route('/download_qr')
 @login_required
