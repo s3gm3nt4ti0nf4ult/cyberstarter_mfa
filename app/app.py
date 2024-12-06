@@ -6,7 +6,7 @@ import io
 import base64
 
 app = Flask(__name__)
-app.secret_key = 'secret'
+app.secret_key = 'secret1234@'
 app.config['SESSION_COOKIE_NAME'] = 'cookie'
 
 def get_db():
@@ -44,19 +44,43 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username','')
-        password = request.form.get('password','')
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
         db = get_db()
-        cur = db.execute('SELECT id,password,otp_secret FROM users WHERE username=?',[username])
+        cur = db.execute('SELECT id, password, otp_secret FROM users WHERE username = ?', [username])
         row = cur.fetchone()
+
         if row and row[1] == password:
             if row[2]:
+                # User has OTP enabled; proceed to OTP verification
                 session['pre_otp_user'] = username
-                return redirect(url_for('otp'))
-            session['username'] = username
-            return redirect(url_for('index'))
+                response = redirect(url_for('otp'))
+            else:
+                # User does not have OTP; set the session and redirect to index
+                session['username'] = username
+                response = redirect(url_for('index'))
+
+            # **Extract and Print the Session Token**
+            session_cookie = response.headers.get('Set-Cookie')
+            if session_cookie:
+                # Assuming the cookie name is 'cookie' as per your configuration
+                cookie_name = app.config.get('SESSION_COOKIE_NAME', 'cookie')
+                # Split the 'Set-Cookie' header to parse individual cookie attributes
+                cookie_parts = session_cookie.split(';')
+                for part in cookie_parts:
+                    part = part.strip()
+                    if part.startswith(f"{cookie_name}="):
+                        # Extract the cookie value
+                        cookie_value = part[len(f"{cookie_name}="):]
+                        print(f"Session Token Set for user '{username}': {cookie_value}")
+                        break
+            else:
+                print(f"No 'Set-Cookie' header found in the response for user '{username}'.")
+
+            return response
         else:
-            flash("bad password")
+            flash("Bad username or password. Please try again.")
+
     return render_template('login.html')
 
 @app.route('/otp', methods=['GET', 'POST'])
